@@ -57,7 +57,7 @@ void Raven_Controller::init_sys()
 	this->RADIUS = 1;
 	this->SPEED = 1;
 	this->DIRECTION = 1;
-	this-> BASE_PLANE =  YZ_PLANE;
+	this-> BASE_PLANE =  XY_PLANE;
 
 	this->PUB_COUNT = 0;
 	this->SUB_COUNT = 0;
@@ -126,7 +126,7 @@ void Raven_Controller::init_pathplanner()
 	}
 	if(!LEFT_PATH.set_BasePlane(BASE_PLANE) || !RIGHT_PATH.set_BasePlane(BASE_PLANE))
 	{
-		ROS_ERROR("Fail to set circle base plane. Exiting!");
+		ROS_ERROR("Fail to set circle base plane. Exciting!");
 		exit(1);
 	}
 
@@ -512,8 +512,8 @@ void* Raven_Controller::ros_process(void)
 			{
 				// normal moving case
 				//TF_INCR[LEFT_ARM] = LEFT_PATH.ComputeNullTrajectory(); 
-				TF_INCR[LEFT_ARM] = LEFT_PATH.ComputeCircleTrajectory();
-				TF_INCR[RIGHT_ARM] = RIGHT_PATH.ComputeCircleTrajectory();
+				TF_INCR[LEFT_ARM] = LEFT_PATH.ComputeSquareTrajectory();
+				TF_INCR[RIGHT_ARM] = RIGHT_PATH.ComputeSquareTrajectory();
 
 			}
 

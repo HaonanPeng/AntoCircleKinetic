@@ -52,11 +52,7 @@ using namespace std;
 
 enum PATH_STATE{
 	AROUND_CIRCLE,	// go along circle trajectory
-	MOVETO_CIRCLE,	// move to the new circle (when radius or center change)
-	SIDE_ONE,
-	SIDE_TWO,
-	SIDE_THREE,
-	SIDE_FOUR,
+	MOVETO_CIRCLE	// move to the new circle (when radius or center change)
 };
 
 
@@ -95,14 +91,11 @@ class Raven_PathPlanner
 		tfScalar Kp;
 		tfScalar sign(tfScalar);
 		void checkPathState();
-		void checkSquarePathState();
 		void AutoCircleMotion1();		// algorithm 1 : kind of unstable
 		void AutoCircleMotion2();		// algorithm 2 : better!
 		void AutoCircleMotion3();		// algorithm 3 : even better! 
 		tf::Vector3 AutoCircleMotion4();	// algorithm 4 : the best so far! (in use!!)	
-		tf::Vector3 AutoSquareMotion4(char side);	// square motions! : obviously superior	
 		tf::Vector3 TuneRadiusMotion();
-		tf::Vector3 TuneSquareNormal(char side);
 
 	public:
 		Raven_PathPlanner();
@@ -134,7 +127,6 @@ class Raven_PathPlanner
 
 		tfScalar DistanceOf(tf::Vector3,tf::Vector3);
 		tf::Transform ComputeCircleTrajectory();
-		tf::Transform ComputeSquareTrajectory();
 		tf::Transform ComputeNullTrajectory();
 };
 #endif

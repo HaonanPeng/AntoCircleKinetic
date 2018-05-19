@@ -174,7 +174,7 @@ bool Raven_PathPlanner::set_Center(boost::array<int, 6> center)
 
 	// (2) update distance between current pos and center pos 
 	Distance = DistanceOf(Center,Current_Pos); 
-	checkSquarePathState();
+	checkPathState();
 
 	return true;
 }
@@ -216,7 +216,7 @@ bool Raven_PathPlanner::set_Current_Pos(boost::array<int, 6> currpos)
 	
 	// (2) update distance between current pos and center pos 
 	Distance = DistanceOf(Center,Current_Pos); 
-	checkSquarePathState();
+	checkPathState();
 
 	return true;
 }
@@ -347,47 +347,6 @@ void Raven_PathPlanner::checkPathState()
 
 	if(Distance == 0 || Error > STATE_THRESHOLD)
 		PathState = MOVETO_CIRCLE;	
-}
-
-/**
-*	\fn void checkSquarePathState()
-*
-* 	\brief this function checks whether RAVEN is in AROUND_CIRCLE or MOVETO_CIRCLE state
-*	       AROUND_CIRCLE : occurs when RAVEN Current_Pos is in-orbit and follows the circle.
-*              MOVETO_CIRCLE : occurs when RAVEN is finding its way back to the orbit.
-*
-* 	\param void
-*
-*	\return void
-*/
-void Raven_PathPlanner::checkSquarePathState()
-{
-	static char first_check = 1;
-
-	if(first_check){
-		PathState = SIDE_ONE;
-		first_check = 0;
-	}	
-
-	switch(PathState){
-		case(SIDE_ONE):
-			if (Current_Pos.getY() < Center.getY() - Radius)
-				PathState = SIDE_TWO;
-			break;
-		case(SIDE_TWO):
-			if (Current_Pos.getX() > Center.getX() + Radius)
-				PathState = SIDE_THREE;
-			break;
-		case(SIDE_THREE):
-			if (Current_Pos.getY() > Center.getY())
-				PathState = SIDE_FOUR;
-			break;
-		case(SIDE_FOUR):
-			if (Current_Pos.getX() < Center.getX())
-				PathState = SIDE_ONE;
-			break;
-	}	
-
 }
 
 
@@ -688,82 +647,6 @@ tf::Transform Raven_PathPlanner::ComputeCircleTrajectory()
 	return TF_INCR;
 }
 
-
-
-/**
-*	\fn tf::Transform ComputeSquareTrajectory()
-*
-* 	\brief this function delta motion commands for RAVEN to follow square trajectory
-*
-* 	\param void
-*
-*	\return tf::Transform
-*/
-tf::Transform Raven_PathPlanner::ComputeSquareTrajectory()
-{
-	tf::Transform TF_INCR;
-
-	pthread_mutex_lock(&data1Mutex);
-
-	tf::Vector3 Delta_Comp, Delta_Move; 
-
-	switch(PathState)
-	{
-
-	/*
-	SIDE_ONE,
-	SIDE_TWO,
-	SIDE_THREE,
-	SIDE_FOUR,
-	*/
-
-		case SIDE_ONE:
-			Delta_Comp = TuneSquareNormal(SIDE_ONE);  // normal direction
-			Delta_Move = AutoSquareMotion4(SIDE_ONE); // tangent direction
-
-			break;
-		case SIDE_TWO:
-			Delta_Comp = TuneSquareNormal(SIDE_TWO);  // normal direction
-			Delta_Move = AutoSquareMotion4(SIDE_TWO); // tangent direction
-			//move along x
-			break;
-		case SIDE_THREE:
-			Delta_Comp = TuneSquareNormal(SIDE_THREE);  // normal direction
-			Delta_Move = AutoSquareMotion4(SIDE_THREE); // tangent direction
-			//move along y
-			break;
-		case SIDE_FOUR:
-			//move along x
-			Delta_Comp = TuneSquareNormal(SIDE_FOUR);  // normal direction
-			Delta_Move = AutoSquareMotion4(SIDE_FOUR); // tangent direction		
-			break;
-
-		default:
-			ROS_ERROR("Undefined PathState. We can only send NULL Trajectory!");
-			Delta_Pos.setValue(0,0,0);
-			break;	
-	}
-
-
-	K = .25;
-	K = (K>1) ? 1 : K; // K should not be larger than 1
-	Delta_Pos = (K)*Delta_Comp + (1-K)*Delta_Move;
-	Delta_Pos = Delta_Pos.normalized()*Speed;	
-
-	// (2) no rotation increment
-	tfScalar  W = 1;
-	tfScalar QX = 0;
-	tfScalar QY = 0;
-	tfScalar QZ = 0;			
-	tf::Quaternion Delta_Ori(QX,QY,QZ,W);
-
-	// (3) add increment to return variable
-	TF_INCR.setOrigin(Delta_Pos);   
-	TF_INCR.setRotation(Delta_Ori); 
-	pthread_mutex_unlock(&data1Mutex);
-
-	return TF_INCR;
-}
 
 
 /**
@@ -1131,38 +1014,6 @@ tf::Vector3 Raven_PathPlanner::AutoCircleMotion4()
 }
 
 
-/**
-*	\fn tf::Vector3 AutoCircleMotion4()
-*
-* 	\brief this is the fourth algorithm for circle trajectory generation
-*
-* 	\param void
-*
-*	\return tf::Vector3 
-*/
-tf::Vector3 Raven_PathPlanner::AutoSquareMotion4(char side)
-{
-	tf::Vector3 del_Vector;
-
-	switch(side)
-	{
-		case SIDE_ONE: //-y
-			del_Vector.setValue(0,-Speed,0);
-			break;
-		case SIDE_TWO: //+x
-			del_Vector.setValue(Speed,0,0);
-			break;
-		case SIDE_THREE: //+y
-			del_Vector.setValue(0,Speed,0);
-			break;
-		case SIDE_FOUR: //-x
-			del_Vector.setValue(-Speed,0,0);
-			break;						
-	}
-
-	return  del_Vector;
-}
-
 
 /**
 *	\fn tf::Vector3 TuneRadiusMotion()
@@ -1211,92 +1062,6 @@ tf::Vector3 Raven_PathPlanner::TuneRadiusMotion()
 		else
 			del_Vector = Speed * del_Vector;
 	}
-
-	return del_Vector;
-}
-
-/**
-*	\fn tf::Vector3 TuneSquareNormal()
-*
-* 	\brief this is the algorithm to help robot navigate to the correct radius value
-*
-* 	\param void
-*
-*	\return tf::Vector3 
-*/
-tf::Vector3 Raven_PathPlanner::TuneSquareNormal(char side)
-{
-	tf::Vector3 now_Vector,del_Vector;
-
-	now_Vector = Current_Pos - Center;
-	
-	switch(Base_Plane)
-	{
-		case YZ_PLANE:
-			now_Vector.setX(0);
-		break;
-		case XZ_PLANE:
-			now_Vector.setY(0);
-		break;
-		case XY_PLANE:
-			now_Vector.setZ(0);
-		break;
-	}
-
-	switch(side)
-	{
-		case SIDE_ONE: //check with x +/- of 0
-			now_Vector.setY(0);
-			now_Vector.setZ(0);
-			del_Vector = now_Vector.normalized();
-
-			if(now_Vector.getX() >  Center.getX() + STATE_THRESHOLD) //move negative towards x = 0
-				del_Vector = - Speed * del_Vector;
-			else if(now_Vector.getX() <  Center.getX() - STATE_THRESHOLD) //move positive towards x = 0
-				del_Vector =   Speed * del_Vector;
-			break;
-
-		case SIDE_TWO: //check with y +/- of -radius	
-			now_Vector.setX(0);
-			now_Vector.setZ(0);
-			del_Vector = now_Vector.normalized();
-			if(now_Vector.getY() >  Center.getY() - Radius + STATE_THRESHOLD) //move negative towards y = -radius
-				del_Vector = - Speed * del_Vector;
-			else if(now_Vector.getY() <  Center.getY() - Radius - STATE_THRESHOLD) //move positive towards y = -radius
-				del_Vector =   Speed * del_Vector;				
-			break;	
-
-		case SIDE_THREE: //check within x +/- of radius
-			now_Vector.setY(0);
-			now_Vector.setZ(0);
-			del_Vector = now_Vector.normalized();
-
-			if(now_Vector.getX() >  Center.getX() + Radius + STATE_THRESHOLD) //move negative towards x = radius
-				del_Vector = - Speed * del_Vector;
-			else if(now_Vector.getX() <  Center.getX() + Radius - STATE_THRESHOLD) //move positive towards x = radius
-				del_Vector =   Speed * del_Vector;
-
-			break;
-
-		case SIDE_FOUR: //check within y +/- of 0
-			now_Vector.setX(0);
-			now_Vector.setZ(0);
-			del_Vector = now_Vector.normalized();	
-
-			if(now_Vector.getY() > Center.getX() + STATE_THRESHOLD) //move negative towards y = -radius
-				del_Vector = - Speed * del_Vector;
-			else if(now_Vector.getY() <  Center.getX() - STATE_THRESHOLD) //move positive towards y = -radius
-				del_Vector =   Speed * del_Vector;						
-			break;
-			
-	}
-
-	//check threshold of z
-	if(now_Vector.getZ() >  Center.getZ() + STATE_THRESHOLD) //move negative towards Z = 0
-		del_Vector.setZ(-Speed);
-	else if(now_Vector.getZ() >  Center.getZ() - STATE_THRESHOLD) //move positive towards Z = 0
-		del_Vector.setZ( Speed);
-
 
 	return del_Vector;
 }
